@@ -13,12 +13,16 @@ Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTen
 
 def latent_gan_experiment():
 
+    real_path = "./data/Adult.csv"
+    fake_paths = ["./data/Adult_fake.csv"]
+    evaluate(real_path, fake_paths)
+
     bottleneck = 32
     gan_batch_size = 256
     gan_latent_dim = 100
     
     ae = LatentTAE(embedding_size=bottleneck)
-    ae.fit(n_epochs=1)
+    ae.fit(n_epochs=1000)
 
     lat_data = ae.get_latent_dataset()
     lat_data_np = [ d.cpu().detach().numpy().flatten() for d in lat_data ]
@@ -28,12 +32,12 @@ def latent_gan_experiment():
     gan = LatentGAN(bottleneck)
     latent_data = np.loadtxt("./data/latent.csv", delimiter=",")
 
-    gan.fit(latent_data, ae.train_data, ae.transformer.output_info, epochs=10)
+    gan.fit(latent_data, ae.train_data, ae.transformer, epochs=2000)
 
     cond_generator = Condvec(ae.train_data, ae.transformer.output_info)
 
     ### Generating a batch
-    z = Tensor(np.random.normal(0, 1, (gan_batch_size, gan_latent_dim)))
+    z = Tensor(np.random.uniform(0, 1, (gan_batch_size, gan_latent_dim)))
     z_cond = Tensor(cond_generator.sample(gan_batch_size))
     z = torch.cat([z, z_cond], dim=1).to(gan.device)
 
@@ -43,7 +47,10 @@ def latent_gan_experiment():
     please_work = ae.decode(generated_rows, batch=True)
     print(please_work)
 
-
+    df = gan.sample(len(lat_data), ae)
+    df.to_csv("./data/Adult_fake.csv")
+    print(df)
+    
 def ae_experiment():
     ae = LatentTAE()
     ae.fit()
@@ -57,11 +64,14 @@ def ae_experiment():
     reconstructed_data = ae.decode(lat_data)
     print(reconstructed_data)
     print(len(reconstructed_data))
-    
-    real_path = "./data/Adult.csv"
-    fake_paths = ["./data/Adult_decoded.csv"]
+
     reconstructed_data.to_csv("./data/Adult_decoded.csv", index=False)
 
+    real_path = "./data/Adult.csv"
+    fake_paths = ["./data/Adult_decoded.csv"]
+    evaluate(real_path, fake_paths)
+
+def evaluate(real_path, fake_paths):
     print("Computing statistical similarities")
 
     adult_categorical = ['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'race', 'gender', 'native-country', 'income']
@@ -85,8 +95,6 @@ def ae_experiment():
     result_df  = pd.DataFrame(result_mat,columns = ["Acc", "AUC", "F1_Score"])
     result_df.index = classifiers_list
     print(result_df)
-
-
 
 if __name__ == "__main__":
     latent_gan_experiment()

@@ -104,7 +104,7 @@ class LatentTAE:
             table = []
             latent = latent.cpu().detach().numpy()
 
-            for l in tqdm(latent):
+            for l in latent:
                 reconstructed = self.ae.decode(Tensor(l))
                 reconstructed = np.asarray(
                     [reconstructed.cpu().detach().numpy()])
@@ -117,7 +117,7 @@ class LatentTAE:
             return pd.concat(table)
         else:
             table = []
-            for l in tqdm(latent):
+            for l in latent:
                 reconstructed = self.ae.decode(l)
                 reconstructed = reconstructed.cpu().detach().numpy()
 

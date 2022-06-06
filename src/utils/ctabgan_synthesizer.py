@@ -194,10 +194,12 @@ def cond_loss(data, output_info, c, m):
         elif item[1] == 'softmax':
             ed = st + item[0]
             ed_c = st_c + item[0]
+            print(torch.argmax(c[:, st_c:ed_c], dim=1))
             tmp = F.cross_entropy(
-            data[:, st:ed],
-            torch.argmax(c[:, st_c:ed_c], dim=1),
-            reduction='none')
+                data[:, st:ed],
+                torch.argmax(c[:, st_c:ed_c], dim=1),
+                reduction='none'
+            )
             tmp_loss.append(tmp)
             st = ed
             st_c = ed_c

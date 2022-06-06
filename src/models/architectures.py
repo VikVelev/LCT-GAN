@@ -11,7 +11,7 @@ class FCEncoder(nn.Module):
         self.fc1 = nn.Linear(input_size, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, output_size)
-
+    
     def forward(self, x):
         h0 = F.relu(self.fc1(x))
         h1 = F.relu(self.fc2(h0))
@@ -78,6 +78,5 @@ class FCDiscriminator(nn.Module):
         self.batch_size = batch_size
 
     def forward(self, data):
-        print(self.input_size)
         data_flat = data.view(data.shape[0], self.input_size)
         return self.model(data_flat)
