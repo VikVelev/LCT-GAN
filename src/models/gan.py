@@ -1,6 +1,7 @@
-from torch import batch_norm, nn, optim
+from torch import batch_norm, nn, optim, rand
 from torch.nn import functional as F
 import torch.autograd as autograd
+import random
 
 import numpy as np
 import torch
@@ -8,18 +9,30 @@ from tqdm import tqdm
 
 from torch.autograd import Variable
 from .architectures import FCDiscriminator, FCGenerator
+from src.utils.ctabgan_synthesizer import Condvec, Sampler
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 
-class GAN:
+class LatentGAN:
 
-    def __init__(self, generator, discriminator, input_size, latent_dim=100):
-        self.generator = FCGenerator(input_size, latent_dim) if generator is None else generator
-        self.discriminator = FCDiscriminator(input_size) if discriminator is None else discriminator
-        self.latent_dim = self.generator.latent_dim if generator is None else latent_dim
+    # input_size should be input_size + cond_vector
+    def __init__(self, input_size, latent_dim=100):
+        self.input_size = input_size
+        self.generator = None
+        self.discriminator = None
+        self.latent_dim = latent_dim
         # Loss weight for gradient penalty
         self.lambda_gp = 10
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def fit(self, dataloader, b1=0.5, b2=0.999, clip_value=0.01, lr=0.0002, epochs=5, n_critic=5):
+    def fit(self, latent_data, original_data, transformer_output_info, batch_size=256, b1=0.5, b2=0.999, clip_value=0.01, lr=0.0002, epochs=5, n_critic=5):
+        
+        assert len(latent_data) == len(original_data)
+        
+        cond_generator = Condvec(original_data, transformer_output_info)
+        data_sampler = Sampler(original_data, transformer_output_info)
+
+        self.generator = FCGenerator(self.input_size, self.latent_dim + cond_generator.n_opt) 
+        self.discriminator = FCDiscriminator(self.input_size + cond_generator.n_opt, batch_size=batch_size)
 
         if torch.cuda.is_available():
             self.generator.cuda()
@@ -30,52 +43,71 @@ class GAN:
         optimizer_D = torch.optim.Adam(self.discriminator.parameters(), lr=lr, betas=(b1, b2))
 
         batches_done = 0
+
         for epoch in tqdm(range(epochs)):
-            for i, imgs in enumerate(dataloader):
-                # Configure input
-                real_imgs = Variable(imgs.type(Tensor))
+            
+            cond_vecs = cond_generator.sample_train(batch_size)
+            c, m, col, opt = cond_vecs
+            c = torch.from_numpy(c).to(self.device)
+            m = torch.from_numpy(m).to(self.device)
 
-                #  Train Discriminator
-                optimizer_D.zero_grad()
+            # sampling real data according to the conditional vectors and shuffling it before feeding to discriminator to isolate conditional loss on generator
+            original_idx = data_sampler.sample_idx(batch_size, col, opt)
+            real = latent_data[original_idx]
+            real = torch.from_numpy(real.astype('float32')).to(self.device)
 
-                # Sample noise as generator input
-                z = Variable(Tensor(np.random.normal(0, 1, (imgs.shape[0], self.latent_dim))))
+            # storing shuffled ordering of the conditional vectors
 
-                # Generate a batch of images
-                fake_imgs = self.generator(z)
+            # Dimension should be [[latent], [latent]] with dimensions (batch_size x len(latent))
+            data_batch = torch.cat([real, c], dim=1).to(self.device)
 
-                # Real images
-                real_validity = self.discriminator(real_imgs)
-                # Fake images
-                fake_validity = self.discriminator(fake_imgs)
-                # Gradient penalty
-                gradient_penalty = self.compute_gradient_penalty(self.discriminator, real_imgs.data, fake_imgs.data)
-                # Adversarial loss
-                d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + self.lambda_gp * gradient_penalty
+            # Configure input
+            real = Variable(data_batch.type(Tensor))
 
-                d_loss.backward()
-                optimizer_D.step()
+            #  Train Discriminator
+            optimizer_D.zero_grad()
 
-                optimizer_G.zero_grad()
+            # Sample noise as generator input
+            z = Tensor(np.random.normal(0, 1, (data_batch.shape[0], self.latent_dim)))
+            z = torch.cat([z , c], dim=1)
+            z = Variable(z)
 
-                # Train the generator every n_critic steps
-                if i % n_critic == 0:
+            # Generate a batch of images
+            fake = self.generator(z)
 
-                    # Generate a batch of images
-                    fake_imgs = self.generator(z)
-                    # Loss measures generator's ability to fool the discriminator
-                    # Train on fake images
-                    fake_validity = self.discriminator(fake_imgs)
-                    g_loss = -torch.mean(fake_validity)
+            real_probability = self.discriminator(real)
+            fake_probability = self.discriminator(torch.cat([fake, c], dim=1).to(self.device))
+            # Gradient penalty
+            fake_gp = torch.cat([fake, c], dim=1)
+            real_gp = real
 
-                    g_loss.backward()
-                    optimizer_G.step()
+            gradient_penalty = self.compute_gradient_penalty(self.discriminator, real_gp.data, fake_gp.data)
+            # Adversarial loss
+            d_loss = -torch.mean(real_probability) + torch.mean(fake_probability) + self.lambda_gp * gradient_penalty
 
-                    print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]" 
-                        % (epoch, epochs, i, len(dataloader), d_loss.item(), g_loss.item())
-                    )
+            d_loss.backward()
 
-                    batches_done += n_critic
+            optimizer_D.step()
+            optimizer_G.zero_grad()
+
+            # Train the generator every n_critic steps
+            if random.randint(0, n_critic) == n_critic:
+
+                # Generate a batch of data
+                fake = self.generator(z)
+                # Loss measures generator's ability to fool the discriminator
+                # Train on fake data
+                fake_probability = self.discriminator(torch.cat([fake, c], dim=1).to(self.device))
+                g_loss = -torch.mean(fake_probability)
+
+                g_loss.backward()
+                optimizer_G.step()
+
+                print("[Epoch %d/%d] [D loss: %f] [G loss: %f]" 
+                    % (epoch, epochs, d_loss.item(), g_loss.item())
+                )
+
+                batches_done += n_critic
 
     def compute_gradient_penalty(self, D, real_samples, fake_samples):
 

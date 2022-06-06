@@ -118,10 +118,10 @@ class Condvec(object):
 
         # matrix of shape (batch x total no. of one-hot-encoded representations) with 1 in indexes of chosen representations and 0 elsewhere
         mask = np.zeros((batch, self.n_col), dtype='float32')
-        mask[np.arange(batch), idx] = 1  
+        mask[np.arange(batch), idx] = 1
         
         # producing a list of selected categories within each of selected one-hot-encoding representation
-        opt1prime = random_choice_prob_index_sampling(self.p_log_sampling,idx) 
+        opt1prime = random_choice_prob_index_sampling(self.p_log_sampling, idx) 
         
         # assigning the appropriately chosen category for each corresponding conditional vector
         for i in np.arange(batch):
@@ -266,6 +266,22 @@ class Sampler(object):
             idx.append(np.random.choice(self.model[c][o]))
         
         return self.data[idx]
+
+    def sample_idx(self, n, col, opt):
+        
+        # if there are no one-hot-encoded representations, we may ignore sampling using a conditional vector
+        if col is None:
+            idx = np.random.choice(np.arange(self.n), n)
+            return self.data[idx]
+        
+        # used to store relevant indices of data records based on selected category within a chosen one-hot-encoding
+        idx = []
+        
+        # sampling a data record index randomly from all possible indices that meet the given criteria of the chosen category and one-hot-encoding
+        for c, o in zip(col, opt):
+            idx.append(np.random.choice(self.model[c][o]))
+        
+        return idx
 
 def get_st_ed(target_col_index,output_info):
     

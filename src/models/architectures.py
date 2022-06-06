@@ -63,10 +63,14 @@ class FCDiscriminator(nn.Module):
         super(FCDiscriminator, self).__init__()
 
         self.model = nn.Sequential(
-            nn.Linear(input_size, 16),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(16, 8),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(input_size, 128),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(128, 64),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(64, 32),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(32, 8),
+            nn.LeakyReLU(0.1, inplace=True),
             nn.Linear(8, 1),
         )
         
@@ -74,5 +78,6 @@ class FCDiscriminator(nn.Module):
         self.batch_size = batch_size
 
     def forward(self, data):
+        print(self.input_size)
         data_flat = data.view(data.shape[0], self.input_size)
         return self.model(data_flat)

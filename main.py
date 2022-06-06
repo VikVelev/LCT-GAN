@@ -1,7 +1,8 @@
 from src.models.autoencoder import LatentTAE
-from src.models.gan import GAN
+from src.models.gan import LatentGAN
 from src.models.architectures import FCGenerator, FCDiscriminator
 from src.utils.evaluation import get_utility_metrics, stat_sim
+from src.utils.ctabgan_synthesizer import Condvec
 
 import pandas as pd
 import numpy as np
@@ -13,28 +14,29 @@ Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTen
 def latent_gan_experiment():
 
     bottleneck = 32
-    gan_batch_size = 64
+    gan_batch_size = 256
     gan_latent_dim = 100
     
     ae = LatentTAE(embedding_size=bottleneck)
-    ae.fit(n_epochs=2000)
+    ae.fit(n_epochs=1)
 
     lat_data = ae.get_latent_dataset()
-    # print(lat_data)
     lat_data_np = [ d.cpu().detach().numpy().flatten() for d in lat_data ]
     np.savetxt("./data/latent.csv", lat_data_np, delimiter=",")
     print(len(lat_data))
 
-    generator = FCGenerator(bottleneck, gan_latent_dim)
-    discriminator = FCDiscriminator(bottleneck, batch_size=gan_batch_size)
-    gan = GAN(generator, discriminator, bottleneck)
-    data = np.loadtxt("./data/latent.csv", delimiter=",")
-    print(data)
-    dataloader = torch.utils.data.DataLoader(data, batch_size=gan_batch_size, shuffle=True)
+    gan = LatentGAN(bottleneck)
+    latent_data = np.loadtxt("./data/latent.csv", delimiter=",")
 
-    gan.fit(dataloader, epochs=10)
+    gan.fit(latent_data, ae.train_data, ae.transformer.output_info, epochs=10)
 
-    z = Variable(Tensor(np.random.normal(0, 1, (gan_batch_size, gan_latent_dim))))
+    cond_generator = Condvec(ae.train_data, ae.transformer.output_info)
+
+    ### Generating a batch
+    z = Tensor(np.random.normal(0, 1, (gan_batch_size, gan_latent_dim)))
+    z_cond = Tensor(cond_generator.sample(gan_batch_size))
+    z = torch.cat([z, z_cond], dim=1).to(gan.device)
+
     generated_rows = gan.generator(z)
     print(generated_rows)
 
