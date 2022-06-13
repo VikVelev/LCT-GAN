@@ -3,9 +3,11 @@ from src.models.gan import LatentGAN
 from src.models.architectures import FCGenerator, FCDiscriminator
 from src.utils.evaluation import get_utility_metrics, stat_sim
 from src.utils.ctabgan_synthesizer import Condvec
+from sklearn.preprocessing import StandardScaler
 
 import pandas as pd
 import numpy as np
+import pickle
 
 import torch
 from torch.autograd import Variable
@@ -13,42 +15,46 @@ Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTen
 
 def latent_gan_experiment():
 
-    real_path = "./data/Adult.csv"
-    fake_paths = ["./data/Adult_fake.csv"]
-    evaluate(real_path, fake_paths)
+    # real_path = "./data/Adult.csv"
+    # fake_paths = ["./data/Adult_fake.csv"]
+    # evaluate(real_path, fake_paths)
 
-    bottleneck = 32
-    gan_batch_size = 256
+    # raise RuntimeError()
+
+    bottleneck = 64
+    gan_batch_size = 1024
     gan_latent_dim = 100
     
     ae = LatentTAE(embedding_size=bottleneck)
-    ae.fit(n_epochs=1000)
+    ae.fit(n_epochs=300, batch_size=1024)
+    
+    picklefile = open(f"ae_pickles/latent_ae{bottleneck}.pickle", 'wb')
+    pickle.dump(ae, picklefile)
 
+    ae = pickle.load(open(f"ae_pickles/latent_ae{bottleneck}.pickle", 'rb'))
+
+    # Try to normalize through scaler sklearn
     lat_data = ae.get_latent_dataset()
     lat_data_np = [ d.cpu().detach().numpy().flatten() for d in lat_data ]
-    np.savetxt("./data/latent.csv", lat_data_np, delimiter=",")
-    print(len(lat_data))
 
-    gan = LatentGAN(bottleneck)
+
+
+    np.savetxt("./data/latent.csv", lat_data_np, delimiter=",")
+
+    
     latent_data = np.loadtxt("./data/latent.csv", delimiter=",")
 
-    gan.fit(latent_data, ae.train_data, ae.transformer, epochs=2000)
+    sscaler = StandardScaler()
+    sscaler.fit(latent_data)
+    lat_normalized = sscaler.transform(latent_data)
 
-    cond_generator = Condvec(ae.train_data, ae.transformer.output_info)
+    print(len(lat_data))
 
-    ### Generating a batch
-    z = Tensor(np.random.uniform(0, 1, (gan_batch_size, gan_latent_dim)))
-    z_cond = Tensor(cond_generator.sample(gan_batch_size))
-    z = torch.cat([z, z_cond], dim=1).to(gan.device)
+    gan = LatentGAN(gan_latent_dim)
+    gan.fit(lat_normalized, ae.train_data, ae.transformer, epochs=200, batch_size=gan_batch_size)
 
-    generated_rows = gan.generator(z)
-    print(generated_rows)
-
-    please_work = ae.decode(generated_rows, batch=True)
-    print(please_work)
-
-    df = gan.sample(len(lat_data), ae)
-    df.to_csv("./data/Adult_fake.csv")
+    df = gan.sample(len(lat_data), ae, sscaler)
+    df.to_csv("./data/Adult_fake.csv", index=False)
     print(df)
     
 def ae_experiment():

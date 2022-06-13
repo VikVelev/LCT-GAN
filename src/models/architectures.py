@@ -11,7 +11,7 @@ class FCEncoder(nn.Module):
         self.fc1 = nn.Linear(input_size, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, output_size)
-    
+
     def forward(self, x):
         h0 = F.relu(self.fc1(x))
         h1 = F.relu(self.fc2(h0))
@@ -37,18 +37,16 @@ class FCGenerator(nn.Module):
         self.latent_dim = latent_size
 
         def block(in_feat, out_feat, normalize=True):
-            layers = [nn.Linear(in_feat, out_feat)]
+            layers = [ nn.Linear(in_feat, out_feat) ]
             if normalize:
                 layers.append(nn.BatchNorm1d(out_feat, 0.8))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            layers.append(nn.LeakyReLU(0.1, inplace=True))
             return layers
 
         self.model = nn.Sequential(
             *block(self.latent_dim, 128, normalize=False),
-            *block(128, 256),
-            *block(256, 256),
-            *block(256, 128),
-            nn.Linear(128, self.output_size),
+            *block(128, 64),
+            nn.Linear(64, self.output_size),
             nn.Tanh()
         )
 
@@ -63,15 +61,16 @@ class FCDiscriminator(nn.Module):
         super(FCDiscriminator, self).__init__()
 
         self.model = nn.Sequential(
-            nn.Linear(input_size, 128),
-            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(input_size, 256),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(256, 128),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(128, 64),
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.Linear(64, 32),
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.Linear(32, 8),
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.Linear(8, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(64, 16),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(16, 1),
+            nn.Sigmoid()
         )
         
         self.input_size = input_size

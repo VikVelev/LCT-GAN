@@ -27,7 +27,7 @@ class LatentTAE:
     """
 
     def __init__(self,
-                 embedding_size=16,
+                 embedding_size,
                  raw_csv_path="./data/Adult.csv",
                  test_ratio=0.20,
                  categorical_columns=['workclass', 'education', 'marital-status',
@@ -50,7 +50,7 @@ class LatentTAE:
         self.problem_type = problem_type
         self.train_data = None
 
-    def fit(self, n_epochs=5000):
+    def fit(self, n_epochs, batch_size):
 
         self.data_prep = DataPrep(
             self.raw_df,
@@ -74,11 +74,11 @@ class LatentTAE:
         data_dim = self.transformer.output_dim
         data_info = self.transformer.output_info
 
-        self.ae.train(self.train_data, data_dim, data_info, epochs=n_epochs)
+        self.ae.train(self.train_data, data_dim, data_info, epochs=n_epochs, batch_size=batch_size)
 
         ##### TEST #####
         print("######## DEBUG ########")
-        real = np.asarray([self.train_data[0]])
+        real = np.asarray(self.train_data[0:batch_size])
 
         latent = self.ae.encode(real)
         reconstructed = self.ae.decode(latent)
@@ -102,7 +102,7 @@ class LatentTAE:
     def decode(self, latent, batch=False):
         if batch:
             table = []
-            latent = latent.cpu().detach().numpy()
+            latent = latent if type(latent).__module__ == np.__name__ else latent.cpu().detach().numpy()
 
             for l in latent:
                 reconstructed = self.ae.decode(Tensor(l))
@@ -129,8 +129,6 @@ class LatentTAE:
             return pd.concat(table)
 
     def get_latent_dataset(self, leave_pytorch_context=False):
-
-        cond_generator = Condvec(self.train_data, self.transformer.output_info)
 
         latent_dataset = []
         for d in self.train_data:
@@ -180,14 +178,12 @@ class AutoEncoder(object):
     def decode(self, z):
         return self.model.decode(z)
 
-    def train(self, data, output_dim: int, output_info, epochs=5000, batch_size=1024):
+    def train(self, data, output_dim: int, output_info, epochs, batch_size):
 
-        # initializing the sampler object to execute training-by-sampling
         data_sampler = Sampler(data, output_info)
-        # initializing the condvec object to sample conditional vectors during training
         cond_generator = Condvec(data, output_info)
 
-        col_size_d = output_dim  # + cond_generator.n_opt
+        col_size_d = output_dim
         self.input_size = col_size_d
 
         self.model = AENetwork(self.args, input_dim=col_size_d)
@@ -199,35 +195,29 @@ class AutoEncoder(object):
 
         last_loss = 0
 
-        for i in tqdm(range(epochs)):
+        steps = int(len(data) / batch_size)
+        for e in tqdm(range(epochs)):
+            for i in range(steps):
+                # sample all conditional vectors for the training
+                _, _, col, opt = cond_generator.sample_train(batch_size)
 
-            # sample all conditional vectors for the training
-            cond_vecs = cond_generator.sample_train(batch_size)
-            c, m, col, opt = cond_vecs
-            c = torch.from_numpy(c).to(self.device)
-            m = torch.from_numpy(m).to(self.device)
+                # sampling real data according to the conditional vectors and shuffling it before feeding to discriminator to isolate conditional loss on generator
+                perm = np.arange(batch_size)
+                np.random.shuffle(perm)
+                real = data_sampler.sample(batch_size, col[perm], opt[perm])
 
-            # sampling real data according to the conditional vectors and shuffling it before feeding to discriminator to isolate conditional loss on generator
-            perm = np.arange(batch_size)
-            np.random.shuffle(perm)
-            real = data_sampler.sample(batch_size, col[perm], opt[perm])
+                batch = torch.from_numpy(real.astype('float32')).to(self.device)
 
-            real = torch.from_numpy(real.astype('float32')).to(self.device)
+                self.optimizer.zero_grad()
 
-            # storing shuffled ordering of the conditional vectors
-            c_perm = c[perm]
-            batch = torch.cat([real], dim=1).to(self.device)
-            data = batch
+                recon_batch = self.model(batch)
 
-            self.optimizer.zero_grad()
-            recon_batch = self.model(data)
-            loss = self.loss_function(
-                recon_batch, data, input_size=self.input_size)
-            loss.backward()
-            train_loss += loss.item()
-            self.optimizer.step()
-            last_loss = (loss.item() / len(data))
+                loss = self.loss_function(recon_batch, batch, input_size=self.input_size)
+                loss.backward()
 
-            # print(loss.item() / len(data))
+                train_loss += loss.item()
+                self.optimizer.step()
+
+                last_loss = (loss.item() / len(batch))
 
         print(last_loss)
