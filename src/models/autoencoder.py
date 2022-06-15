@@ -40,8 +40,7 @@ class LatentTAE:
 
         self.__name__ = 'AutoEncoder'
         self.raw_df = pd.read_csv(raw_csv_path)
-        self.ae = AutoEncoder(
-            {"embedding_size": embedding_size, "log_interval": 5})
+        self.ae = AutoEncoder({"embedding_size": embedding_size, "log_interval": 5})
         self.test_ratio = test_ratio
         self.categorical_columns = categorical_columns
         self.log_columns = log_columns
@@ -49,6 +48,7 @@ class LatentTAE:
         self.integer_columns = integer_columns
         self.problem_type = problem_type
         self.train_data = None
+        self.loss = None
 
     def fit(self, n_epochs, batch_size):
 
@@ -70,14 +70,18 @@ class LatentTAE:
 
         self.transformer.fit()
         self.train_data = self.transformer.transform(self.data_prep.df.values)
+        self.batch_size = batch_size
 
         data_dim = self.transformer.output_dim
         data_info = self.transformer.output_info
 
-        self.ae.train(self.train_data, data_dim, data_info, epochs=n_epochs, batch_size=batch_size)
+        print(f"DATA DIMENSION: {self.train_data.shape}")
 
+        self.ae.train(self.train_data, data_dim, data_info, epochs=n_epochs, batch_size=batch_size)
+        self.loss = self.ae.loss
         ##### TEST #####
         print("######## DEBUG ########")
+
         real = np.asarray(self.train_data[0:batch_size])
 
         latent = self.ae.encode(real)
@@ -104,10 +108,14 @@ class LatentTAE:
             table = []
             latent = latent if type(latent).__module__ == np.__name__ else latent.cpu().detach().numpy()
 
-            for l in latent:
-                reconstructed = self.ae.decode(Tensor(l))
-                reconstructed = np.asarray(
-                    [reconstructed.cpu().detach().numpy()])
+            batch_start = 0
+            steps = (len(latent) // self.batch_size) + 1
+            for _ in tqdm(range(steps)):
+                l = latent[batch_start: batch_start + self.batch_size]
+                if len(l) == 0: continue
+                batch_start += self.batch_size
+                reconstructed = self.ae.decode(torch.cat(l).to(self.ae.device))
+                reconstructed = reconstructed.cpu().detach().numpy()
 
                 recon_inverse = self.transformer.inverse_transform(
                     reconstructed)
@@ -117,12 +125,17 @@ class LatentTAE:
             return pd.concat(table)
         else:
             table = []
-            for l in latent:
+            batch_start = 0
+            steps = (len(latent) // self.batch_size) + 1
+            for _ in tqdm(range(steps)):
+                l = latent[batch_start: batch_start + self.batch_size]
+                if len(l) == 0: continue
+                batch_start += self.batch_size
+                l = torch.cat(l).to(self.ae.device)
                 reconstructed = self.ae.decode(l)
                 reconstructed = reconstructed.cpu().detach().numpy()
 
-                recon_inverse = self.transformer.inverse_transform(
-                    reconstructed)
+                recon_inverse = self.transformer.inverse_transform(reconstructed)
                 table_recon = self.data_prep.inverse_prep(recon_inverse)
                 table.append(table_recon)
 
@@ -131,9 +144,14 @@ class LatentTAE:
     def get_latent_dataset(self, leave_pytorch_context=False):
 
         latent_dataset = []
-        for d in self.train_data:
-            latent_dataset.append(self.encode(d).cpu().detach(
-            ).numpy() if leave_pytorch_context else self.encode(d))
+        print("Generating latent dataset")
+        steps = (len(self.train_data) // self.batch_size) + 1
+        curr = 0
+        for _ in tqdm(range(steps)):
+            data = self.train_data[curr : curr + self.batch_size]
+            if len(data) == 0: continue
+            latent_dataset.append(self.encode(data).cpu().detach().numpy() if leave_pytorch_context else self.encode(data))
+            curr += self.batch_size
 
         return latent_dataset
 
@@ -165,6 +183,7 @@ class AutoEncoder(object):
             "cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = None
         self.cond_generator = None
+        self.last_loss = None
 
     def loss_function(self, recon_x, x, input_size):
         # BCE = F.binary_cross_entropy(recon_x, x.view(-1, input_size), reduction='sum')
@@ -210,7 +229,7 @@ class AutoEncoder(object):
 
                 self.optimizer.zero_grad()
 
-                recon_batch = self.model(batch)
+                recon_batch = self.model(batch).to(self.device)
 
                 loss = self.loss_function(recon_batch, batch, input_size=self.input_size)
                 loss.backward()
@@ -221,3 +240,4 @@ class AutoEncoder(object):
                 last_loss = (loss.item() / len(batch))
 
         print(last_loss)
+        self.loss = last_loss

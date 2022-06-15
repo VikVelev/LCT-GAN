@@ -17,7 +17,7 @@ Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTen
 class LatentGAN:
 
     # input_size should be input_size + cond_vector
-    def __init__(self, input_size, latent_dim=100):
+    def __init__(self, input_size, latent_dim, minutes=15):
         self.input_size = input_size
         self.generator = None
         self.discriminator = None
@@ -45,6 +45,8 @@ class LatentGAN:
         self.discriminator = FCDiscriminator(self.input_size + cond_generator.n_opt, batch_size=batch_size)
         # self.discriminator = FCDiscriminator(self.input_size, batch_size=batch_size)
 
+        self.generator.to(self.device)
+        self.discriminator.to(self.device)
 
         if torch.cuda.is_available():
             self.generator.cuda()
@@ -59,7 +61,10 @@ class LatentGAN:
         loss_g  = torch.tensor([1.0]) # just for logging purposes, it is reassigned down
         loss_d = torch.tensor([1.0])
 
-        for epoch in range(epochs):
+        self.generator.train()
+        self.discriminator.train()
+
+        for epoch in tqdm(range(epochs)):
             for i in range(steps):
 
                 cond_vecs = cond_generator.sample_train(batch_size)
@@ -74,20 +79,20 @@ class LatentGAN:
                 ### TRAIN DISCRIMINATOR
                 optimizer_D.zero_grad()
 
-                z = Tensor(np.random.uniform(0, 1, (batch_size, self.latent_dim)))
-                z = torch.cat([z , c], dim=1)
-                # z = torch.cat([z], dim=1)
-                z = Variable(z)
+                z = Tensor(np.random.uniform(0, 1, (batch_size, self.latent_dim))).to(self.device)
+                z = torch.cat([z , c], dim=1).to(self.device)
+                # z = torch.cat([z], dim=1).to(self.device)
+                z = Variable(z).to(self.device)
 
-                fake = self.generator(z)
+                fake = self.generator(z).to(self.device)
                 
-                fake_cat_d = torch.cat([fake, c], dim=1).to(self.device)
+                fake_cat_d = torch.cat([fake, c], dim=1).to(self.device).to(self.device)
                 # fake_cat_d = torch.cat([fake], dim=1).to(self.device)
                 real_cat_d = torch.cat([Variable(real.type(Tensor)), c], dim=1).to(self.device)
                 # real_cat_d = torch.cat([Variable(real.type(Tensor))], dim=1).to(self.device)
 
-                real_probability = self.discriminator(real_cat_d)
-                fake_probability = self.discriminator(fake_cat_d)
+                real_probability = self.discriminator(real_cat_d).to(self.device)
+                fake_probability = self.discriminator(fake_cat_d).to(self.device)
 
                 # Gradient penalty
                 gradient_penalty = self.compute_gradient_penalty(self.discriminator, real_cat_d.data, fake_cat_d.data)
@@ -103,7 +108,7 @@ class LatentGAN:
                 
                 if i % n_critic == 0:
                     # Generate a batch of data
-                    fake = self.generator(z)
+                    fake = self.generator(z).to(self.device)
                     # print(fake)
                     # Loss measures generator's ability to fool the discriminator
                     fake_probability = self.discriminator(torch.cat([fake, c], dim=1).to(self.device))
@@ -116,7 +121,7 @@ class LatentGAN:
                     optimizer_G.step()
 
             print("[Epoch %d/%d] [D loss: %f] [G loss: %f]" 
-                % (epoch, epochs, loss_d.item(), loss_g.item())
+                % (epoch + 1, epochs, loss_d.item(), loss_g.item())
             )
 
     def compute_gradient_penalty(self, D, real_samples, fake_samples):
@@ -124,12 +129,12 @@ class LatentGAN:
         """Calculates the gradient penalty loss for WGAN GP"""
 
         # Random weight term for interpolation between real and fake samples
-        alpha = Tensor(np.random.random((real_samples.size(0), 1)))
+        alpha = Tensor(np.random.random((real_samples.size(0), 1))).to(self.device)
         # Get random interpolation between real and fake samples
-        interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
+        interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True).to(self.device)
         d_interpolates = D(interpolates)
 
-        fake = Variable(Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False)
+        fake = Variable(Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False).to(self.device)
         # Get gradient w.r.t. interpolates
         gradients = autograd.grad(
             outputs=d_interpolates,
@@ -152,7 +157,7 @@ class LatentGAN:
         # generating synthetic data in batches accordingly to the total no. required
         steps = n // self.batch_size + 1
         data = []
-        for _ in range(steps):
+        for _ in tqdm(range(steps)):
             # generating synthetic data using sampled noise and conditional vectors
             ### Generating a batch
             z = Tensor(np.random.uniform(0, 1, (self.batch_size, self.latent_dim)))

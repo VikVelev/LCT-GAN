@@ -11,6 +11,7 @@ class FCEncoder(nn.Module):
         self.fc1 = nn.Linear(input_size, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, output_size)
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def forward(self, x):
         h0 = F.relu(self.fc1(x))
@@ -35,6 +36,7 @@ class FCGenerator(nn.Module):
 
         self.output_size = output_size
         self.latent_dim = latent_size
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         def block(in_feat, out_feat, normalize=True):
             layers = [ nn.Linear(in_feat, out_feat) ]
@@ -44,14 +46,15 @@ class FCGenerator(nn.Module):
             return layers
 
         self.model = nn.Sequential(
-            *block(self.latent_dim, 128, normalize=False),
-            *block(128, 64),
+            *block(self.latent_dim, 16, normalize=False),
+            *block(16, 32),
+            *block(32, 64),
             nn.Linear(64, self.output_size),
             nn.Tanh()
         )
 
     def forward(self, z):
-        img = self.model(z)
+        img = self.model(z.to(self.device))
         img = img.view(img.shape[0], self.output_size)
         return img
 
@@ -59,15 +62,14 @@ class FCGenerator(nn.Module):
 class FCDiscriminator(nn.Module):
     def __init__(self, input_size, batch_size):
         super(FCDiscriminator, self).__init__()
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         self.model = nn.Sequential(
-            nn.Linear(input_size, 256),
+            nn.Linear(input_size, 64),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(256, 128),
+            nn.Linear(64, 32),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(128, 64),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(64, 16),
+            nn.Linear(32, 16),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(16, 1),
             nn.Sigmoid()
@@ -77,5 +79,5 @@ class FCDiscriminator(nn.Module):
         self.batch_size = batch_size
 
     def forward(self, data):
-        data_flat = data.view(data.shape[0], self.input_size)
+        data_flat = data.to(self.device).view(data.shape[0], self.input_size)
         return self.model(data_flat)
