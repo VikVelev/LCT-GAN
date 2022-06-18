@@ -1,0 +1,6 @@
+(   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.075209                           0.056524              2.452483,       Acc       AUC  F1_Score
+lr    4.6  0.119043  0.333115
+dt   13.8  0.261569  0.303594
+rf    7.0  0.172555  0.327126
+mlp   7.0  0.249193  0.361728)

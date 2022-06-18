@@ -1,0 +1,40 @@
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.061464                           0.029381              9.126003
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                          0.05159                           0.029381              5.587324
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.051973                           0.029381              5.396234
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052258                           0.029381              5.236598
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052321                           0.029381              5.224815
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052333                           0.029381              5.247339
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052339                           0.029381              5.242384
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052313                           0.029381              5.221711
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052391                           0.029381               5.20284
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052376                           0.029381              5.216092
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052317                           0.029381              5.198368
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052348                           0.029381              5.232146
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052311                           0.029381              5.237261
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052324                           0.029381              5.225224
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052421                           0.029381              5.230018
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052433                           0.029381              5.208121
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052294                           0.029381              5.203942
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.052418                           0.029381              5.196384
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.040123                           0.029381              6.319383
+   Average WD (Continuous Columns)  Average JSD (Categorical Columns)  Correlation Distance
+0                         0.040031                           0.029381              5.875103

@@ -46,8 +46,7 @@ class FCGenerator(nn.Module):
             return layers
 
         self.model = nn.Sequential(
-            *block(self.latent_dim, 16, normalize=False),
-            *block(16, 32),
+            *block(self.latent_dim, 32, normalize=False),
             *block(32, 64),
             nn.Linear(64, self.output_size),
             nn.Tanh()
@@ -67,9 +66,7 @@ class FCDiscriminator(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(input_size, 64),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(64, 32),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(32, 16),
+            nn.Linear(64, 16),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(16, 1),
             nn.Sigmoid()

@@ -110,27 +110,32 @@ class LatentTAE:
 
             batch_start = 0
             steps = (len(latent) // self.batch_size) + 1
-            for _ in tqdm(range(steps)):
+
+            for _ in range(steps):
+
                 l = latent[batch_start: batch_start + self.batch_size]
-                if len(l) == 0: continue
                 batch_start += self.batch_size
-                reconstructed = self.ae.decode(torch.cat(l).to(self.ae.device))
+                if len(l) == 0: continue
+
+                reconstructed = self.ae.decode(Tensor(l).to(self.ae.device))
                 reconstructed = reconstructed.cpu().detach().numpy()
 
-                recon_inverse = self.transformer.inverse_transform(
-                    reconstructed)
+                recon_inverse = self.transformer.inverse_transform(reconstructed)
                 table_recon = self.data_prep.inverse_prep(recon_inverse)
                 table.append(table_recon)
 
             return pd.concat(table)
+
         else:
+            # TODO: Refactor
             table = []
             batch_start = 0
             steps = (len(latent) // self.batch_size) + 1
-            for _ in tqdm(range(steps)):
+            for _ in range(steps):
                 l = latent[batch_start: batch_start + self.batch_size]
-                if len(l) == 0: continue
                 batch_start += self.batch_size
+                if len(l) == 0: continue
+
                 l = torch.cat(l).to(self.ae.device)
                 reconstructed = self.ae.decode(l)
                 reconstructed = reconstructed.cpu().detach().numpy()
@@ -149,11 +154,12 @@ class LatentTAE:
         curr = 0
         for _ in tqdm(range(steps)):
             data = self.train_data[curr : curr + self.batch_size]
-            if len(data) == 0: continue
-            latent_dataset.append(self.encode(data).cpu().detach().numpy() if leave_pytorch_context else self.encode(data))
             curr += self.batch_size
-
-        return latent_dataset
+            if len(data) == 0: continue
+            latent = self.encode(data).cpu().detach().numpy()
+            latent_dataset = [ *latent_dataset, *latent ]
+        
+        return np.asarray(latent_dataset)
 
 
 class AENetwork(nn.Module):

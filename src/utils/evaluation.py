@@ -161,7 +161,6 @@ def stat_sim(real_path,fake_path,cat_cols=None):
   across categorical columns and euclidean norm of the difference in pair-wise correlations between real and synthetic datasets
     
   """
-    
   # Loading real and synthetic data
   real = pd.read_csv(real_path)
   fake = pd.read_csv(fake_path)
