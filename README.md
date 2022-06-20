@@ -2,7 +2,24 @@
 
 Improving tabular data synthesis, by introducing a novel latent gan architecture, using autoencoder as an embedding for tabular data and decreasing training time and use of computational resources.
 
-## AE Results
+# How to reproduce
+
+One needs python 3.10 and poetry.
+
+```
+git clone https://github.com/VikVelev/LCT-GAN
+cd LCT-GAN
+poetry install
+poetry shell
+python main.py
+```
+
+All experiments, as outlined in the paper will run.
+
+# Experiments
+Experiments below are not relevant to the final results discussed in the paper.
+They could be used as guidance to hyperparameter tuning.
+## AE Experiments Results
 
 ```
 ### Time: 37:29 (AutoEncoder Only) 2.00s per epoch
@@ -32,7 +49,7 @@ rf   4.821374  0.057608  0.081647
 mlp  3.828437  0.032753  0.105722
 ```
 
-## GAN Results
+## GAN Experiments Results
 ```
 gan_epochs < 100 is very low, and it does not learn anything
 
