@@ -1,8 +1,8 @@
 # LCT-GAN
 
-This is part of a Bachelor Thesis - TU Delft Research Project CSE3000 2022. Under the supervision of Zilong Zhao and Lydia Chen.
-
 Improving tabular data synthesis, by introducing a novel latent gan architecture, using autoencoder as an embedding for tabular data and decreasing training time and use of computational resources.
+
+[Paper](Improving_the_efficiency_of_tabular_data_synthesis_via_latent_embeddings.pdf)
 
 # How to reproduce
 
@@ -164,3 +164,7 @@ rf   10.134098  0.186097  0.268143
 mlp  10.574266  0.188727  0.211743
 
 ```
+
+### Acknowledgements
+
+This is part of a Bachelor Thesis - TU Delft Research Project CSE3000 2022. Under the supervision of Zilong Zhao and Lydia Chen.
